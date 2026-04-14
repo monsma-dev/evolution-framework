@@ -1,0 +1,200 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Core\Evolution\Growth;
+
+use App\Core\Config;
+use App\Core\Evolution\ComplianceLogger;
+use App\Core\Evolution\DeepSeekClient;
+use App\Core\Evolution\EvolutionLogger;
+use App\Core\Evolution\MarketSignalModel;
+use App\Core\Evolution\PiiScanner;
+use PDO;
+
+/**
+ * Uses deepseek-reasoner (R1) to analyse the top 10 market signals and output a
+ * concrete "Next Action" for the Growth Machine.
+ *
+ * R1 <think> traces are written to storage/logs/evolution_reasoning.log.
+ *
+ * CLI usage:
+ *   php ai_bridge.php evolution:strategy generate
+ */
+final class StrategyGenerator
+{
+    private const REASONING_LOG = 'storage/logs/evolution_reasoning.log';
+    private const REASONER      = DeepSeekClient::MODEL_REASONER;
+    private const MAX_TOKENS    = 3500;
+    private const TOP_SIGNALS   = 10;
+
+    public function __construct(
+        private readonly Config $config,
+        private readonly PDO    $db
+    ) {
+    }
+
+    /**
+     * Generate the next high-priority growth action from current top signals.
+     *
+     * @return array{ok: bool, next_action?: string, target_niche?: string, priority?: string, rationale?: string, suggested_template?: string, error?: string}
+     */
+    public function generateNextAction(): array
+    {
+        $apiKey = trim((string)$this->config->get('ai.deepseek.api_key', ''));
+        if ($apiKey === '') {
+            return ['ok' => false, 'error' => 'DEEPSEEK_API_KEY not configured.'];
+        }
+
+        $model = new MarketSignalModel($this->db, $this->config);
+        $signals = $model->getTopByIntentScore(0.7, self::TOP_SIGNALS);
+
+        if (empty($signals)) {
+            return ['ok' => false, 'error' => 'No qualifying signals (intent_score >= 0.7) in the database.'];
+        }
+
+        $signalBlock = $this->formatSignals($signals);
+
+        $system = <<<'SYSTEM'
+You are the autonomous Growth Strategist for a European secondhand marketplace.
+Your job: analyse the provided high-intent market signals and produce ONE concrete "Next Action"
+that will generate the most revenue in the next 48 hours.
+
+Think step by step. Consider:
+- Which niche has the strongest buy intent?
+- Is there a mismatch between demand signals and likely supply?
+- What specific outreach message would convert the highest-intent buyers?
+
+Respond with a single JSON object (no markdown fences):
+{
+  "next_action": "specific 1-sentence instruction for the outreach agent",
+  "target_niche": "niche slug",
+  "priority": "critical|high|medium",
+  "rationale": "2-3 sentences explaining the reasoning",
+  "suggested_message_template": "outreach DM/listing template (max 280 chars)",
+  "estimated_conversion_uplift": "e.g. +15%"
+}
+SYSTEM;
+
+        $user = "TOP MARKET SIGNALS (sorted by intent_score DESC):\n" . $signalBlock;
+
+        $client = new DeepSeekClient($apiKey);
+        $client->setReasoningLogFile(self::REASONING_LOG);
+
+        $raw = $client->complete($system, [['role' => 'user', 'content' => $user]], self::REASONER, self::MAX_TOKENS, false);
+
+        if ($raw === '') {
+            EvolutionLogger::log('growth', 'strategy_failed', [
+                'http_status' => $client->getLastHttpStatus(),
+                'signals'     => count($signals),
+            ]);
+
+            return ['ok' => false, 'error' => 'DeepSeek reasoner returned empty (status: ' . $client->getLastHttpStatus() . ').'];
+        }
+
+        $decoded = $this->decodeJson($raw);
+        if ($decoded === null || empty($decoded['next_action'])) {
+            return ['ok' => false, 'error' => 'Invalid strategy JSON from R1.', 'raw_excerpt' => mb_substr($raw, 0, 400)];
+        }
+
+        // Police-Agent validation before activating strategy
+        $validator  = new PromptValidator($this->config);
+        $validation = $validator->validate($raw, 'StrategyGenerator output');
+
+        if (!$validation['approved']) {
+            EvolutionLogger::log('growth', 'strategy_blocked_by_police', [
+                'risk_score' => $validation['risk_score'],
+                'verdict'    => $validation['verdict'],
+                'issues'     => $validation['issues'],
+            ]);
+            ComplianceLogger::log(
+                $this->db,
+                'StrategyGenerator',
+                ComplianceLogger::ACTION_STRATEGY_BLOCKED,
+                'Police-Agent rejected strategy (risk_score=' . $validation['risk_score'] . '): ' . $validation['verdict']
+            );
+
+            return [
+                'ok'         => false,
+                'error'      => 'Police-Agent rejected strategy: ' . $validation['verdict'],
+                'risk_score' => $validation['risk_score'],
+                'issues'     => $validation['issues'],
+            ];
+        }
+
+        // ── EU AI Act Art. 50: Transparency injection ────────────────────────────
+        // Every strategy output must be marked as AI-generated.
+        $decoded['ai_transparency_footer'] =
+            'Generated by Evolution Sovereign AI Core - Human oversight required';
+
+        // ── Compliance audit log per strategy decision ───────────────────────────
+        ComplianceLogger::log(
+            $this->db,
+            'StrategyGenerator',
+            ComplianceLogger::ACTION_TRANSPARENCY_ADDED,
+            'Strategy approved (risk_score=' . $validation['risk_score'] . '). AI transparency footer injected. Niche: ' . ($decoded['target_niche'] ?? '?')
+        );
+
+        EvolutionLogger::log('growth', 'strategy_generated', [
+            'next_action'  => mb_substr((string)($decoded['next_action'] ?? ''), 0, 120),
+            'target_niche' => $decoded['target_niche'] ?? '',
+            'priority'     => $decoded['priority'] ?? '',
+            'risk_score'   => $validation['risk_score'],
+        ]);
+
+        return [
+            'ok'                   => true,
+            'next_action'          => (string)($decoded['next_action'] ?? ''),
+            'target_niche'         => (string)($decoded['target_niche'] ?? ''),
+            'priority'             => (string)($decoded['priority'] ?? 'medium'),
+            'rationale'            => (string)($decoded['rationale'] ?? ''),
+            'suggested_template'   => (string)($decoded['suggested_message_template'] ?? ''),
+            'estimated_uplift'     => (string)($decoded['estimated_conversion_uplift'] ?? ''),
+            'validation'           => ['risk_score' => $validation['risk_score'], 'verdict' => $validation['verdict']],
+        ];
+    }
+
+    // ─── Private helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * @param list<array<string, mixed>> $signals
+     */
+    private function formatSignals(array $signals): string
+    {
+        $lines = [];
+        foreach ($signals as $i => $s) {
+            $meta = [];
+            if (is_string($s['signal_meta'] ?? null)) {
+                $m = json_decode((string)$s['signal_meta'], true);
+                if (is_array($m)) {
+                    $meta = $m;
+                }
+            }
+            $lines[] = sprintf(
+                '%d. score=%.2f | source=%s | niche=%s | %s%s',
+                $i + 1,
+                (float)($s['intent_score'] ?? 0),
+                $s['source'] ?? '?',
+                $s['niche'] ?? '?',
+                mb_substr((string)($s['raw_content'] ?? ''), 0, 180),
+                !empty($meta['url']) ? ' [' . $meta['url'] . ']' : ''
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeJson(string $raw): ?array
+    {
+        $t = trim($raw);
+        if (preg_match('/```(?:json)?\s*([\s\S]+?)\s*```/i', $t, $m)) {
+            $t = trim($m[1]);
+        }
+        $d = json_decode($t, true);
+
+        return is_array($d) ? $d : null;
+    }
+}
