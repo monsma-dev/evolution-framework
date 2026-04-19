@@ -1,0 +1,28 @@
+{
+  "skill_id": "resource_harvester",
+  "version": "1.0.0",
+  "scope": "evolution_capital",
+  "tags": ["base", "yield", "staking", "lp", "gas", "validator", "academy-blacklist"],
+  "summary": "Geen CPU-mining: gebruik slapende on-chain middelen voor passief rendement op Base (8453). Vergelijk geschatte APR met gas (USD) voordat je iets vastzet.",
+  "constraints": {
+    "cpu": "Geen busy-loops; alleen JSON-RPC calls en optioneel één off-chain search (Tavily/GitHub API).",
+    "safety": "Elke target-contractadres MOET door ResourceHarvesterService::assertProtocolAllowed() — combinatie van evolution.resource_harvester.unsafe_contracts, trading.governance.approved_protocols (allowlist), en storage/evolution/academy_cache/protocol_blacklist_base.json indien aanwezig.",
+    "logging": "Caveman-kanaal: korte regels — 'Yield found.', 'Staking start.', 'Profit target set.' (EvolutionLogger channel caveman)."
+  },
+  "protocols": {
+    "base": {
+      "chain_id": 8453,
+      "dex": ["Uniswap V3 (SwapRouter02 0x2626…)", "Aerodrome (veilig alleen na allowlist-check)"],
+      "note": "V2-router in evolution.trading.evm.uniswap_v2_router — gebruik governance.approved_protocols voor router-level trust."
+    }
+  },
+  "logic": {
+    "wallet_scan": "eth_getBalance + optioneel ERC-20 balance voor USDC/WETH via eth_call naar bekende Base token addresses uit evolution.trading.evm.",
+    "yield_vs_gas": "If estimated_annual_yield_usd < (gas_estimate_usd * min_roundtrips) + min_surplus_after_gas_usd → do not stake; log reason to evolution.log",
+    "master_policy": "Alleen wanneer sentiment HOLD en vault/trading wallet surplus > min_reserve volgens agents.json master instructie."
+  },
+  "implementation": {
+    "php": "App\\Core\\Evolution\\ResourceHarvesterService",
+    "scout": "App\\Core\\Evolution\\ScoutAlphaHarvestService via php ai_bridge.php evolve:scout alpha"
+  }
+}
