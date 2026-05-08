@@ -18,7 +18,13 @@ This repository is the **Evolution Core** — an extracted subset of the `app/Co
 vendor/bin/phpstan analyse app/Core/Evolution/ --level=0 --no-progress --memory-limit=512M
 ```
 
-PHPStan will report ~636 errors at level 0 because this is an extracted subset missing many classes from the parent repo (e.g., `App\Core\Container`, `App\Core\Config`). These errors are **expected** and do not indicate problems with the Evolution Core code itself.
+PHPStan will report ~636 errors at level 0. The vast majority (630) are `class.notFound` errors from missing parent-repo classes (`App\Core\Container`, `App\Core\Config`, `App\Domain\AI\LlmClient`, etc.) — these are expected for an extracted subset. There are also 6 **internal** errors worth noting:
+
+- 2x `new.noConstructor` — `EvolutionMentorService` is instantiated with parameters but has no constructor.
+- 3x `staticMethod.notFound` — `EvolutionMasterOpinionService` calls undefined static methods on `EvolutionMentorService`.
+- 1x `interface.notFound` — `GeminiClient` implements `LlmCompletionClientInterface` from the parent repo.
+
+The first 5 may indicate real issues within Evolution Core; the last is a parent-repo dependency.
 
 ### Running tests
 
@@ -26,7 +32,17 @@ PHPStan will report ~636 errors at level 0 because this is an extracted subset m
 vendor/bin/phpunit
 ```
 
-No test files exist in this extracted repo (the `tests/` directory is in the parent Framework repo). PHPUnit is installed and ready to run if tests are added.
+No test files or `phpunit.xml` config exist in this extracted repo (both live in the parent Framework repo). PHPUnit 11.5 is installed and ready if tests/config are added.
+
+### Composer scripts caveat
+
+`composer.json` defines `post-install-cmd` and `post-update-cmd` hooks that run `bin/scripts/ensure-ethereum-tx-php83.php`, which does **not exist** in this repo. Always use `--no-scripts` when running `composer install` or `composer update` here:
+
+```bash
+composer install --no-interaction --no-scripts
+```
+
+Similarly, `composer phpstan` references `-c phpstan.neon` which doesn't exist. Use the direct PHPStan command shown above instead.
 
 ### Autoloader caveat
 
