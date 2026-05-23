@@ -1,50 +1,24 @@
-name: Deploy Evolution Framework to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [main]
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-      with:
-        enablement: true
-    
-    - name: Build documentation
-      run: |
-        mkdir -p dist
-        if [ -d "docs" ]; then
-          cp -r docs/* dist/
-        fi
-        if [ -f "README.md" ]; then
-          cp README.md dist/
-        fi
-        # Create index.html altijd
-        echo "<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Evolution Framework Documentation</title></head><body><h1>Evolution Framework</h1><p>Sovereign PHP AI Framework for autonomous systems and intelligent gate orchestration.</p><p>Documentation is being updated.</p></body></html>" > dist/index.html
-      
-     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+    - uses: actions/checkout@v4
+    - uses: actions/configure-pages@v4
+    - run: mkdir -p dist && echo "<html><head><title>Evolution Framework</title></head><body><h1>Evolution Framework</h1></body></html>" > dist/index.html
+    - uses: actions/upload-pages-artifact@v3
       with:
         path: './dist'
-
   deploy:
     environment:
       name: github-pages
@@ -53,6 +27,4 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+    - uses: actions/deploy-pages@v4
