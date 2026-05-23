@@ -37,10 +37,9 @@ jobs:
         if [ -f "README.md" ]; then
           cp README.md dist/
         fi
-        if [ -f "dist/index.html" ]; then
-          echo "<html><head><title>Evolution Framework</title></head><body><h1>Evolution Framework Documentation</h1><p>Documentation is being updated.</p></body></html>" > dist/index.html
-        fi
-     
+       # Create index.html altijd
+        echo "<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Evolution Framework Documentation</title></head><body><h1>Evolution Framework</h1><p>Sovereign PHP AI Framework for autonomous systems end intelligent gate orchestration.</p><p>Documentation is being updated.</p></body></html>" > dist/index.html
+      
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
       with:
