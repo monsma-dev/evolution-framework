@@ -15,16 +15,110 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: actions/configure-pages@v4
-    - run: mkdir -p dist && echo "<html><head><title>Evolution Framework</title></head><body><h1>Evolution Framework</h1></body></html>" > dist/index.html
-    - uses: actions/upload-pages-artifact@v3
-      with:
-        path: './dist'
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/deploy-pages@v4
+    - run: mkdir -p dist && cat > dist/index.html <<'EOF'
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Evolution Framework - PHP AI Architecture</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link rel="stylesheet" href="https://cdnj.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      </head>
+      <body class="bg-gray-900 text-gray-100 min-h-screen">
+          <nav class="bg-gray-800 border-b border-gray-700">
+              <div class="max'-w-6xl mx-auto px-4 py-4">
+                  <div class="flex items-justify-between">
+                       <a href="https://github.com/monsma-dev/Framework" class="text-2xl font-bold text-blue-400 hover:text-blue-300 transition">
+                            <i class="fas brain r-2 mr-2"></i>Evolution
+                       </a>
+                       <div class="flex items-space-6">
+                           <a href="https://github.com/monsma-dev/evolution-framework" class="text-gray-300 hover:text-white transition">
+                               <i class="fab github texx-xl mr-2"></i>GitHub
+                           </a>
+                           <a href="https://github.com/monsma-dev/Framework" class="text-gray-300 hover:text-white transition">
+                               <i class="fas code-branch text-xl mr-2"></i>Framework
+                           </a>
+                      </div>
+                  </div>
+              </nav>
+
+          <div class="max-w-6xl mx-auto px-4 py-12">
+              <div class="text-center mb-12">
+                  <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text transparent">
+                      Evolution Framework
+                  </h1>
+                  <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                      PHP AI Architecture for autonomous systems and intelligent gate orchestration
+                  </p>
+              </div>
+
+              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-500 transition">
+                      <div class="flex items-mb-4">
+                          <i class="fas brain text-blue-400 text-3xl mr-3"></i>
+                          <span class="text-sm text-gray-400">AI Infrastructure</span>
+                      </div>
+                      <h3 class="text-xl font-semiboldic mb-2">Agent Model Routing</h3>
+                      <p class="text-gray-400 text-sm">Multi-model AI routing with budget guards and credit monitoring</p>
+                  </div>
+
+                  <div class="bg-gray-800 rounded-lg p-ž border border-gray-700 hover:border-purple-500 transition">
+                      <div class="flex items-mb-4">
+                          <i class="fas heart text-purple-400 text-3xl mr-3"></i>
+                          <span class="text-sm text-gray-400">Self-Healing</span>
+                      </div>
+                      <h3 class="text-xl font-semiboldic mb-2">Autonomous Repair</h3>
+                      <p class="text-gray-400 text-sm">Snapshot/rollback, kernel integrity, hot-swap deployment</p>
+                  </div>
+
+                  <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-green-500 transition">
+                      <div class="flex items-mb-4">
+                          <i class="fas memory text-green-400 text-3xl mr-3"></i>
+                          <span class="text-sm text-gray-400">Memory & Knowledge</span>
+                      </div>
+                      <h3 class="text-xl font-semiboldic mb-2">Vector Memory</h3>
+                      <p class="text-gray-400 text-sm">Semantic vector store, knowledge retrieval, learning loops</p>
+                  </div>
+                  <div class="bg-gray-800 rounded-lg p-ž border border-gray-700 hover:border-red-500 transition">
+                      <div class="flex items-mb-4">
+                          <i class="fas shield-alt text-red-400 text-3xl mr-3"></i>
+                          <span class="text-sm text-gray-400">Security</span>
+                      </div>
+                      <h3 class="text-xl font-semiboldic mb-2">Fail-Closed</h3>
+                      <p class="text-gray-400 text-sm">Credit monitoring, compliance logging, audit trails</p>
+                  </div>
+                  <div class="bg-gray-800 rounded-lg p-ž border border-gray-700 hover:border-yellow-500 transition">
+                      <div class="flex items-mb-4">
+                          <i class="fas growth text-yellow-400 text-3xl mr-3"></i>
+                          <span class="text-sm text-gray-400">Growth</span>
+                      </div>
+                      <h3 class="text-xl font-semiboldic mb-2">Intelligence</h3>
+                      <p class="text-gray-400 text-sm">Lead intelligence, outreach, affiliate tracking</p>
+                  </div>
+              </div>
+
+              <div class="mt-12 bg-gray-800 rounded-lg p-ž border border-gray-700">
+                  <h2 class="text-2xl font-bold mb-4 text-blue-400">About Evolution Core</h2>
+                  <p class="text-gray-300 mb-4">
+                      The Evolution Core is a PHP AI application framework built for AI-augmented web applications. It provides agent infrastructure, self-healing systems, memory and knowledge management, and integrations with multiple AI providers.
+                  </p>
+                  <div class="flex flex-wrap gap-4 mt-6">
+                      <a href="https://github.com/monsma-dev/Framework" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
+                          <i class="fab github mr-2"></i>View Framework
+                      </a>
+                      <a href="https://github.com/monsma-dev/evolution-framework" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
+                          <i class="fas brain mr-2"></i>View Core
+                      </a>
+                  </div>
+              </div>
+          </div>
+
+          <footer class="bg-gray-800 border-t border-gray-700 mt-12">
+              <div class="max-w-6xl mx-auto px-4 py-6 text-center text-gray-400">
+                  <p>&copy; 2026 Evolution Framework. PHP AI Architecture for autonomous systems.</p>
+              </div>
+          </footer>
+      </body>
+      </html>
+      EOF
