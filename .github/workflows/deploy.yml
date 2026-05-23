@@ -1,0 +1,87 @@
+name: Deploy Evolution Framework to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      with:
+        enablement: true
+    
+    - name: Build documentation
+      run: |
+        mkdir -p dist
+        # Copy documentation files
+        if [ -d "docs" ]; then
+          cp -r docs/* dist/
+        fi
+        # Copy README if exists
+        if [ -f "README.md" ]; then
+          cp README.md dist/
+        fi
+        # Create index.html if no docs exist
+        if [ ! -f "dist/index.html" ] && [ -f "dist/README.md" ]; then
+          cat > dist/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Evolution Framework Documentation</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
+                  pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
+                  code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; }
+              </style>
+          </head>
+          <body>
+              <div id="content"></div>
+              <script>
+                  fetch('README.md')
+                      .then(r => r.text())
+                      .then(text => {
+                          document.getElementById('content').innerHTML = marked.parse(text);
+                      });
+              </script>
+              <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+          </body>
+          </html>
+          EOF
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './dist'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
